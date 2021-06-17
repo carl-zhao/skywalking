@@ -25,11 +25,28 @@ import java.util.List;
  * Created by wusheng on 2016/10/25.
  */
 public interface IConsumer<T> {
+
+    /**
+     * 初始化消费者
+     */
     void init();
 
+    /**
+     * 批量消费消息
+     * @param data
+     */
     void consume(List<T> data);
 
+    /**
+     * 处理消费过程中发生的异常
+     * @param data
+     * @param t
+     */
     void onError(List<T> data, Throwable t);
 
+    /**
+     * 消费结束时通过该方法关闭消费者，释放资源
+     */
     void onExit();
+
 }

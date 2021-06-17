@@ -20,6 +20,9 @@
 package org.apache.skywalking.apm.commons.datacarrier.partition;
 
 /**
+ *
+ * 会根据写入的 Thread ID 进行分发，这样可以保证相同线程写入的数据都在一个 Buffer 中。
+ *
  * use threadid % total to partition
  *
  * Created by wusheng on 2016/10/25.

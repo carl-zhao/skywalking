@@ -24,6 +24,14 @@ import java.util.List;
 import org.apache.skywalking.apm.commons.datacarrier.buffer.Buffer;
 
 /**
+ *
+ * ConsumerThread 是专门与 IConsumer 对象配合使用的消费线程，它继承 Thread ，并封装了一个 IConsumer 对象，
+ * 每个 ConsumerThread 线程可以消费多个 DataSource，这里的 DataSource 是 Buffer 的一部分或是完整的
+ * Buffer（DataSource 通过 start、end 字段标记当前 ConsumerThread 消费的 Buffer 区域）
+ *
+ * 使用 ConsumerThread 我们可以实现一个或多个消费线程处理同一个 Channels 的消费模式。MultipleChannelsConsumer 提供了另一种消费模式，
+ * 与 ConsumerThread 的区别在于：MultipleChannelsConsumer 线程可以处理多组 Group，每个 Group 都是一个 IConsumer + 一个 Channels 的组合。
+ *
  * Created by wusheng on 2016/10/25.
  */
 public class ConsumerThread<T> extends Thread {
@@ -86,18 +94,23 @@ public class ConsumerThread<T> extends Thread {
         boolean hasData = false;
         LinkedList<T> consumeList = new LinkedList<T>();
         for (DataSource dataSource : dataSources) {
+            // DataSource.obtain()方法是对Buffer.obtain()方法的封装
             LinkedList<T> data = dataSource.obtain();
             if (data.size() == 0) {
                 continue;
             }
+            // 将待消费的数据转存到consumeList集合
             consumeList.addAll(data);
+            // 标记此次消费是否有数据
             hasData = true;
         }
 
         if (consumeList.size() > 0) {
             try {
+                // 执行IConsumer.consume()方法中封装的消费逻辑处理消息
                 consumer.consume(consumeList);
             } catch (Throwable t) {
+                // 消费过程中出现异常的时候
                 consumer.onError(consumeList, t);
             }
         }

@@ -20,6 +20,10 @@
 package org.apache.skywalking.apm.commons.datacarrier.partition;
 
 /**
+ *
+ * 简单循环自增选择器，使用无锁整型（volatile 修饰）的自增并取模，选择要写入的 Buffer 。
+ * 当然，在高负载时会产生批量连续写入一个 Buffer 的情况，但在中低负载情况下，可以很好的避免不同线程写
+ * 入数据量不均衡的问题，从而提供较好性能。
  * use normal int to rolling.
  *
  *

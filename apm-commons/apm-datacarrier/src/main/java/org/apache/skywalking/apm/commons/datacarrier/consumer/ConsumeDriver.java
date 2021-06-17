@@ -23,6 +23,23 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.skywalking.apm.commons.datacarrier.buffer.*;
 
 /**
+ *
+ * ConsumerDriver 实现中维护了固定数量的 ConsumerThread 线程（consumerThreads 字段，ConsumerThread[] 类型），
+ * 它们共同消费一个 Channels 中的数据（channels 字段，Channels 类型）。
+ *
+ * ConsumerDriver 的核心逻辑是在其 begin() 方法中，它会根据 Channels 中的 Buffer 数量以及ConsumerThread 线程数进行分配：
+ *
+ * 1. 如果 Buffer 个数较多，则一个 ConsumerThread 线程需要处理多个 Buffer。
+ * 2. 如果 ConsumerThread 线程数较多，则一个 Buffer 会被划分为多个区域，由不同的 ConsumerThread 线程进行消费，也就是前文介绍的，
+ * 每个 ConsumerThread 线程负责消费一个 Buffer 的一个区域。
+ * 3. 如果两者数量正好相同，则是一对一的消费关系。
+ *
+ * 消费的 Channels、ConsumerThread 线程数以及两者的绑定关系一旦确定，在整个 ConsumerDriver 的生命周期中不会再进行变更。
+ *
+ * BulkConsumePool 是 IDriver 接口的另一个实现，在其 allConsumers 字段（List类型）中维护了当前启动的 MultipleChannelsConsumer 线程。
+ * BulkConsumePool 的核心实现在其 add() 方法，通过该方法向 BulkConsumePool 添加新 Channels 以及对应 IConsumer 时，会通过
+ * getLowestPayload() 方法选择负载最低的 MultipleChannelsConsumer 线程进行处理（即当前处理 Group 最少的线程）。
+ *
  * Pool of consumers <p> Created by wusheng on 2016/10/25.
  */
 public class ConsumeDriver<T> implements IDriver {

@@ -24,8 +24,26 @@ import org.apache.skywalking.apm.commons.datacarrier.partition.*;
 
 /**
  * DataCarrier main class. use this instance to set Producer/Consumer Model.
+ *
+ * DataCarrier 是一个轻量级的生产者-消费者模式的实现库， SkyWalking Agent 在收集到 Trace 数据之后，会先写入到 DataCarrier 中的缓存，
+ * 然后由后台线程定时发送到后端的 OAP。其实，在多数涉及网络传输的场景中都会使用这种设计：先在本地缓存数据，然后聚合，最后定时批量发送。
+ *
+ * DataCarrier 底层使用多个定长数组作为存储缓冲区，即 apm-datacarrier 模块中的 Buffer 类，其底层的 buffer 字段（Object[] 类型）
+ * 是真正存储数据的地方。每个 Buffer 内部维护了一个环形指针（AtomicRangeInteger 类型），我们可以指定其中的 value 字段
+ * （AtomicInteger 类型）从 start 值开始递增，当 value 递增到 end 值（int 类型）时，value 字段会被重置为 start 值，
+ * 实现环形指针的效果，这样，Buffer 就可以实现循环覆盖写入的模式了。
+ *
+ * 需要注意的是，AtomicRangeInteger 环形指针底层是基于乐观锁实现的，这样就能够解决并发问题。
+ *
+ * DataCarrier 是整个 DataCarrier 模块最顶层的门面类，其中整合 Channels、IDriver 并给 Producer 提供了一个统一的入口。
+ *
+ * 在 DataCarrier 构造方法中会接收 channelSize、bufferSize 两个参数初始化 Channels ，默认使用 SimpleRollingPartitioner 分区选择器以及
+ * BLOCKING 策略（同时，DataCarrier 提供了修改这两项配置的方法）。DataCarrier 为生产者提供了 produce() 方法（底层调用 Channels.save() 方法），
+ * 统一写入数据的入口。
+ *
  */
 public class DataCarrier<T> {
+
     private final int bufferSize;
     private final int channelSize;
     private Channels<T> channels;

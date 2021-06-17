@@ -22,15 +22,30 @@ import org.apache.skywalking.apm.commons.datacarrier.callback.QueueBlockingCallb
 import org.apache.skywalking.apm.commons.datacarrier.partition.IDataPartitioner;
 
 /**
+ *
+ * Channels 底层管理了多个 Buffer 对象，提供了 IDataPartitioner 选择器用于确定一个数据元素写入到底层的哪个 Buffer 对象中。
+ * 如果你了解 Kafka 可能知道，Kafka Producer 在发送数据时也会有相应的分区策略，IDataPartitioner 与之类似。当数据并行写入的时候，
+ * 由 IDataPartitioner 选择器根据一定的均衡策略将数据分散到不同的 Buffer 中写入，这样就可以有效减少并发导致的自旋锁等待时间，
+ * 降低整个 Channels 的写入压力，提高写入效率。IDataPartitioner 接口有两个实现
+ *
  * Channels of Buffer It contains all buffer data which belongs to this channel. It supports several strategy when buffer
  * is full. The Default is BLOCKING <p> Created by wusheng on 2016/10/25.
  */
 public class Channels<T> {
     private final Buffer<T>[] bufferChannels;
     private IDataPartitioner<T> dataPartitioner;
+
     private BufferStrategy strategy;
     private final long size;
 
+    /**
+     *
+     * @param channelSize 指定 Channels 底层 Buffer 的数量，合理的 Buffer 数量搭配合理的分区选择器，
+     *                    可以让整个 Channels 写入无竞争或很少出现竞争。
+     * @param bufferSize 指定每个 Buffer 的大小，合理的 Buffer 大小可以在满足缓冲能力的同时占用合理的内存大小。
+     * @param partitioner
+     * @param strategy
+     */
     public Channels(int channelSize, int bufferSize, IDataPartitioner<T> partitioner, BufferStrategy strategy) {
         this.dataPartitioner = partitioner;
         this.strategy = strategy;

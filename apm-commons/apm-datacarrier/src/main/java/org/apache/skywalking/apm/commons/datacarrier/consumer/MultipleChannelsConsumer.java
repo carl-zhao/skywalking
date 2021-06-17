@@ -22,6 +22,19 @@ import java.util.*;
 import org.apache.skywalking.apm.commons.datacarrier.buffer.*;
 
 /**
+ *
+ * MultipleChannelsConsumer 可以同时消费多个 Group，每个 Group 中的 IConsumer 对象包含了消费逻辑，Channels 对象包含了待消费的数据，
+ * 需要注意的是，一旦 Channels 被添加到 MultipleChannelsConsumer 中，将会被一个 MultipleChannelsConsumer 完全消费，不会像
+ * ConsumerThread 那样分区域部分消费。
+ *
+ * 在 run() 方法中，MultipleChannelsConsumer 线程会定时循环遍历其消费的全部 Group，一旦发现可消费的数据，就会循环调用
+ * consume() 方法处理每个 Group。
+ *
+ * MultipleChannelsConsumer 底层通过一个 ArrayList 维护 Group 集合（consumeTargets 字段），MultipleChannelsConsumer
+ * 通过 Copy-on-Write 的方式保证线程安全，即在调用 addNewTarget() 方法向 consumeTargets 集合添加 Group 时，会创建一个新的
+ * ArrayList 集合并拷贝原集合内容，然后向新集合中添加数据，待新集合添加完成之后，直接替换原有集合。之所以这样做是因为在添加的过程中，
+ * MultipleChannelsConsumer 线程可能正在循环处理 consumeTargets 集合，这也是 consumeTargets 用 volatile 修饰的原因。
+ *
  * MultipleChannelsConsumer represent a single consumer thread, but support multiple channels with their {@link
  * IConsumer}s
  *
@@ -72,13 +85,16 @@ public class MultipleChannelsConsumer extends Thread {
         LinkedList consumeList = new LinkedList();
         for (int i = 0; i < target.channels.getChannelSize(); i++) {
             Buffer buffer = target.channels.getBuffer(i);
+            // 将该Group中Channels全部可消费的数据都导出到consumeList列表
             consumeList.addAll(buffer.obtain());
         }
 
         if (hasData = consumeList.size() > 0) {
             try {
+                // 通过该Group中相应的IConsumer消费数据
                 target.consumer.consume(consumeList);
             } catch (Throwable t) {
+                // 消费过程的异常处理
                 target.consumer.onError(consumeList, t);
             }
         }
