@@ -47,16 +47,19 @@ public class ConnectionImplCreateInstrumentation extends AbstractMysqlInstrument
             new StaticMethodsInterceptPoint() {
                 @Override
                 public ElementMatcher<MethodDescription> getMethodsMatcher() {
+                    // 增强 getInstance()方法
                     return named(CONNECT_METHOD);
                 }
 
                 @Override
                 public String getMethodsInterceptor() {
+                    // 委托给 ConnectionCreateInterceptor进行增强
                     return "org.apache.skywalking.apm.plugin.jdbc.mysql.v8.ConnectionCreateInterceptor";
                 }
 
                 @Override
                 public boolean isOverrideArgs() {
+                    // 增强过程中无需修改方法参数
                     return false;
                 }
             }
@@ -65,6 +68,7 @@ public class ConnectionImplCreateInstrumentation extends AbstractMysqlInstrument
 
     @Override
     protected ClassMatch enhanceClass() {
+        // 拦截目标类为ConnectionImpl
         return byName(JDBC_ENHANCE_CLASS);
     }
 }

@@ -64,6 +64,7 @@ public class ConstructorInter {
     public void intercept(@This Object obj,
         @AllArguments Object[] allArguments) {
         try {
+            // 前面已经让该对象实现了EnhancedInstance接口，所以这里的类型转换是安全的
             EnhancedInstance targetObject = (EnhancedInstance)obj;
 
             interceptor.onConstruct(targetObject, allArguments);

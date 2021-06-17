@@ -22,6 +22,8 @@ package org.apache.skywalking.apm.agent.core.context.trace;
 /**
  * The <code>LocalSpan</code> represents a normal tracing point, such as a local method.
  *
+ * 它是在本地方法调用时可能创建的 Span 类型，在后面介绍 @Trace 注解的时候我们还会看到 LocalSpan。
+ *
  * @author wusheng
  */
 public class LocalSpan extends AbstractTracingSpan {

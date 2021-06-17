@@ -34,25 +34,38 @@ import org.apache.skywalking.apm.network.trace.component.Component;
  * @author wusheng
  */
 public abstract class AbstractTracingSpan implements AbstractSpan {
+
+    // span的ID
     protected int spanId;
+
+    // 记录父Span的ID
     protected int parentSpanId;
+
+    // 记录Tags的集合
     protected List<TagValuePair> tags;
     protected String operationName;
     protected int operationId;
     protected SpanLayer layer;
     protected boolean isInAsyncMode = false;
+
+    /**
+     * context字段指向TraceContext，TraceContext与当前线程绑定，与TraceSegment一一对应
+     */
     protected volatile AbstractTracerContext context;
 
     /**
      * The start time of this Span.
+     * Span的开始时间
      */
     protected long startTime;
     /**
      * The end time of this Span.
+     * Span的结束时间
      */
     protected long endTime;
     /**
      * Error has occurred in the scope of span.
+     * 标识该Span中是否发生异常
      */
     protected boolean errorOccurred = false;
 
@@ -69,6 +82,8 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
      * The refs of parent trace segments, except the primary one. For most RPC call, {@link #refs} contains only one
      * element, but if this segment is a start span of batch process, the segment faces multi parents, at this moment,
      * we use this {@link #refs} to link them.
+     *
+     * 指向所属TraceSegment
      */
     protected List<TraceSegmentRef> refs;
 
@@ -119,6 +134,8 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
     /**
      * Finish the active Span. When it is finished, it will be archived by the given {@link TraceSegment}, which owners
      * it.
+     *
+     * 该方法会关闭当前 Span ，具体行为是用 endTime 字段记录当前时间，并将当前 Span 记录到所属 TraceSegment 的 spans 集合中。
      *
      * @param owner of the Span.
      */
@@ -263,6 +280,11 @@ public abstract class AbstractTracingSpan implements AbstractSpan {
         return this;
     }
 
+    /**
+     * 该方法会在 Agent 上报 TraceSegment 数据之前调用，它会将当前 AbstractTracingSpan 对象转换成 SpanObjectV2 对象。
+     * SpanObjectV2 是在 proto 文件中定义的结构体，后面 gRPC 上报 TraceSegment 数据时会将其序列化。
+     * @return
+     */
     public SpanObjectV2.Builder transform() {
         SpanObjectV2.Builder spanBuilder = SpanObjectV2.newBuilder();
 

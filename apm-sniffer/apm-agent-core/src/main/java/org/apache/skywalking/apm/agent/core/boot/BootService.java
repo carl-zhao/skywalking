@@ -24,6 +24,9 @@ package org.apache.skywalking.apm.agent.core.boot;
  * work.
  * {@link #boot()} will be called when <code>BootService</code> start up.
  *
+ * SkyWalking Agent  启动的最后一步是使用前面介绍的 JDK SPI 技术加载 BootService 接口的所有实现类，
+ * BootService 接口中定义了 SkyWalking Agent 核心服务的行为
+ *
  * @author wusheng
  */
 public interface BootService {

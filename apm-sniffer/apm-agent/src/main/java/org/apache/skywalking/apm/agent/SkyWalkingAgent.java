@@ -64,8 +64,11 @@ public class SkyWalkingAgent {
     public static void premain(String agentArgs, Instrumentation instrumentation) throws PluginException {
         final PluginFinder pluginFinder;
         try {
+            // 步骤1、初始化配置信息
             SnifferConfigInitializer.initialize(agentArgs);
 
+            // 步骤2~4、查找并解析skywalking-plugin.def插件文件；
+            // AgentClassLoader加载插件类并进行实例化；PluginFinder提供插件匹配的功能
             pluginFinder = new PluginFinder(new PluginBootstrap().loadPlugins());
 
         } catch (ConfigNotFoundException ce) {
@@ -79,31 +82,48 @@ public class SkyWalkingAgent {
             return;
         }
 
+        // 步骤5、使用 Byte Buddy 库创建 AgentBuilder
         final ByteBuddy byteBuddy = new ByteBuddy()
             .with(TypeValidation.of(Config.Agent.IS_OPEN_DEBUGGING_CLASS));
 
+        /**
+         * 简单解释一下这里使用到的 AgentBuilder 的方法：
+         *
+         * ignore() 方法：忽略指定包中的类，对这些类不会进行拦截增强。
+         * type() 方法：在类加载时根据传入的 ElementMatcher 进行拦截，拦截到的目标类将会被 transform() 方法中指定的 Transformer 进行增强。
+         * transform() 方法：这里指定的 Transformer 会对前面拦截到的类进行增强。
+         * with() 方法：添加一个 Listener 用来监听 AgentBuilder 触发的事件。
+         */
+        // 设置使用的ByteBuddy对象
         new AgentBuilder.Default(byteBuddy)
             .ignore(
-                nameStartsWith("net.bytebuddy.")
+                nameStartsWith("net.bytebuddy.")// 不会拦截下列包中的类
                     .or(nameStartsWith("org.slf4j."))
                     .or(nameStartsWith("org.apache.logging."))
                     .or(nameStartsWith("org.groovy."))
                     .or(nameContains("javassist"))
                     .or(nameContains(".asm."))
                     .or(nameStartsWith("sun.reflect"))
-                    .or(allSkyWalkingAgentExcludeToolkit())
+                    .or(allSkyWalkingAgentExcludeToolkit()) // 处理 Skywalking 的类
+                     // synthetic类和方法是由编译器生成的，这种类也需要忽略
                     .or(ElementMatchers.<TypeDescription>isSynthetic()))
+                // 拦截
             .type(pluginFinder.buildMatch())
+                // 设置Transform
             .transform(new Transformer(pluginFinder))
+                // 设置Listener
             .with(new Listener())
             .installOn(instrumentation);
 
         try {
+            // 这里省略创建 AgentBuilder的具体代码，后面展开详细说
+            // 步骤6、使用 JDK SPI加载的方式并启动 BootService 服务。
             ServiceManager.INSTANCE.boot();
         } catch (Exception e) {
             logger.error(e, "Skywalking agent boot failure.");
         }
 
+        // 步骤7、添加一个JVM钩子
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override public void run() {
                 ServiceManager.INSTANCE.shutdown();
@@ -119,15 +139,20 @@ public class SkyWalkingAgent {
         }
 
         @Override
-        public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder, TypeDescription typeDescription,
-            ClassLoader classLoader, JavaModule module) {
+        public DynamicType.Builder<?> transform(DynamicType.Builder<?> builder,
+                                                TypeDescription typeDescription,// 被拦截的目标类
+                                                ClassLoader classLoader, // 加载目标类的ClassLoader
+                                                JavaModule module) {
+            // 从PluginFinder中查找匹配该目标类的插件，PluginFinder的查找逻辑不再重复
             List<AbstractClassEnhancePluginDefine> pluginDefines = pluginFinder.find(typeDescription);
             if (pluginDefines.size() > 0) {
                 DynamicType.Builder<?> newBuilder = builder;
                 EnhanceContext context = new EnhanceContext();
                 for (AbstractClassEnhancePluginDefine define : pluginDefines) {
+                    // AbstractClassEnhancePluginDefine.define()方法是插件入口，在其中完成了对目标类的增强
                     DynamicType.Builder<?> possibleNewBuilder = define.define(typeDescription, newBuilder, classLoader, context);
                     if (possibleNewBuilder != null) {
+                        // 注意这里，如果匹配了多个插件，会被增强多次
                         newBuilder = possibleNewBuilder;
                     }
                 }

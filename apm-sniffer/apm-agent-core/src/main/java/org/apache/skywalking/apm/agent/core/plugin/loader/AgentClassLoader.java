@@ -58,6 +58,7 @@ public class AgentClassLoader extends ClassLoader {
     private static AgentClassLoader DEFAULT_LOADER;
 
     private List<File> classpath;
+    // 在下面的getAllJars()方法中会扫描全部jar文件，并缓存到 allJars字段(List<Jar>类型)中，后续再次扫描时会重用该缓存
     private List<Jar> allJars;
     private ReentrantLock jarScanLock = new ReentrantLock();
 
@@ -70,9 +71,11 @@ public class AgentClassLoader extends ClassLoader {
         for (int i = 0; i < methods.length; i++) {
             Method method = methods[i];
             String methodName = method.getName();
+            // 查找 ClassLoader中的registerAsParallelCapable()静态方法;通过反射方式尝试开启 JDK 的并行加载功能
             if ("registerAsParallelCapable".equalsIgnoreCase(methodName)) {
                 try {
                     method.setAccessible(true);
+                    // 调用registerAsParallelCapable()方法
                     method.invoke(null);
                 } catch (Exception e) {
                     logger.warn(e, "can not invoke ClassLoader.registerAsParallelCapable()");
@@ -102,22 +105,28 @@ public class AgentClassLoader extends ClassLoader {
     }
 
     public AgentClassLoader(ClassLoader parent) throws AgentPackageNotFoundException {
+        // 双亲委派机制
         super(parent);
+        // 获取 skywalking-agent.jar所在的目录
         File agentDictionary = AgentPackagePath.getPath();
         classpath = new LinkedList<File>();
+        // 初始化 classpath集合，指向了skywalking-agent.jar包同目录的两个目录
         classpath.add(new File(agentDictionary, "plugins"));
         classpath.add(new File(agentDictionary, "activations"));
     }
 
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
+        // 扫描过程比较简单，不再展开介绍
         List<Jar> allJars = getAllJars();
         String path = name.replace('.', '/').concat(".class");
+        // 扫描所有jar包，查找类文件
         for (Jar jar : allJars) {
             JarEntry entry = jar.jarFile.getJarEntry(path);
             if (entry != null) {
                 try {
                     URL classFileUrl = new URL("jar:file:" + jar.sourceFile.getAbsolutePath() + "!/" + path);
+                    // 省略读取".class"文件的逻辑  
                     byte[] data = null;
                     BufferedInputStream is = null;
                     ByteArrayOutputStream baos = null;
@@ -149,6 +158,7 @@ public class AgentClassLoader extends ClassLoader {
                 }
             }
         }
+        // 类查找失败，直接抛出异常
         throw new ClassNotFoundException("Can't find " + name);
     }
 

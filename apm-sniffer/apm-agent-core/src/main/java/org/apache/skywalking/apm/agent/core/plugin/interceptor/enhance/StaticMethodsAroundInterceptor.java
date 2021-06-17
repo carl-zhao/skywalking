@@ -31,6 +31,8 @@ public interface StaticMethodsAroundInterceptor {
     /**
      * called before target method invocation.
      *
+     * 在目标方法之前调用。
+     *
      * @param method
      * @param result change this result, if you want to truncate the method.
      */
@@ -40,6 +42,8 @@ public interface StaticMethodsAroundInterceptor {
     /**
      * called after target method invocation. Even method's invocation triggers an exception.
      *
+     * 在目标方法之后调用。
+     *
      * @param method
      * @param ret the method's original return value.
      * @return the method's actual return value.
@@ -48,6 +52,8 @@ public interface StaticMethodsAroundInterceptor {
 
     /**
      * called when occur exception.
+     *
+     * 在目标方法抛出异常时调用。
      *
      * @param method
      * @param t the exception occur.

@@ -40,6 +40,8 @@ import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
  * <p>
  * By default, SAMPLING is on, and  {@link Config.Agent#SAMPLE_N_PER_3_SECS }
  *
+ * 负责实现 Trace 的采样。
+ *
  * @author wusheng
  */
 @DefaultImplementor

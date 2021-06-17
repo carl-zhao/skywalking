@@ -22,6 +22,9 @@ package org.apache.skywalking.apm.agent.core.context.ids;
 /**
  * The <code>PropagatedTraceId</code> represents a {@link DistributedTraceId}, which is propagated from the peer.
  *
+ * PropagatedTraceId 负责处理 Trace 传播过程中的 TraceId。PropagatedTraceId 的构造方法接收一个 String
+ * 类型参数（也就是在跨进程传播时序列化后的 Trace ID），解析之后得到 ID 对象。
+ *
  * @author wusheng
  */
 public class PropagatedTraceId extends DistributedTraceId {

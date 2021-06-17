@@ -23,6 +23,8 @@ import org.apache.skywalking.apm.agent.core.conf.Config;
 import org.apache.skywalking.apm.agent.core.sampling.SamplingService;
 
 /**
+ * 负责创建 Context 对象。
+ *
  * @author wusheng
  */
 @DefaultImplementor

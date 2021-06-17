@@ -38,6 +38,8 @@ import static net.bytebuddy.matcher.ElementMatchers.not;
  * Match the class, which has methods with the certain annotations.
  * This is a very complex match.
  *
+ * 根据标注在方法上的注解匹配目标类。
+ *
  * @author wusheng
  */
 public class MethodAnnotationMatch implements IndirectMatch {

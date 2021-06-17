@@ -31,6 +31,9 @@ import org.apache.skywalking.apm.network.trace.component.Component;
  *
  * Such as: Tomcat Embed - Dubbox The <code>EntrySpan</code> represents the Dubbox span.
  *
+ * 当请求进入服务时会创建 EntrySpan 类型的 Span，它也是 TraceSegment 中的第一个 Span。
+ * 例如，HTTP 服务、RPC 服务、MQ-Consumer 等入口服务的插件在接收到请求时都会创建相应的 EntrySpan。
+ *
  * @author wusheng
  */
 public class EntrySpan extends StackBasedTracingSpan {
@@ -49,6 +52,17 @@ public class EntrySpan extends StackBasedTracingSpan {
 
     /**
      * Set the {@link #startTime}, when the first start, which means the first service provided.
+     *
+     * 1、将 stackDepth 字段（定义在 StackBasedTracingSpan 中）加 1，stackDepth 表示当前所处的插件栈深度 。
+     * 2、更新 currentMaxDepth 字段（定义在 EntrySpan 中），currentMaxDepth 会记录该EntrySpan 到达过的插件栈的最深位置。
+     * 3、此时第一次启动 EntrySpan 时会更新 startTime 字段，记录请求开始时间。
+     *
+     * 注意：
+     * 一是在调用 start() 方法时，会将之前设置的 component、Tags、Log 等信息全部清理掉（startTime不会清理），上例中请求到 Spring MVC
+     * 插件之前（即 ② 处之前）设置的这些信息都会被清理掉。
+     *
+     * 二是 stackDepth 与 currentMaxDepth 不相等时（上例中 ③ 处），无法记录上述字段的信息。通过这两点，我们知道 EntrySpan 实际上
+     * 只会记录最贴近业务侧的 Span 信息。
      */
     @Override
     public EntrySpan start() {

@@ -34,6 +34,8 @@ import static org.apache.skywalking.apm.agent.core.conf.Config.Dictionary.SERVIC
 /**
  * Map of network address id to network literal address, which is from the collector side.
  *
+ * 用于同步网络地址的映射关系。
+ *
  * @author wusheng
  */
 public enum NetworkAddressDictionary {

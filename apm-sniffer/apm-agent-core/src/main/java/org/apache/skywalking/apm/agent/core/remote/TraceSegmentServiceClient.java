@@ -36,6 +36,8 @@ import static org.apache.skywalking.apm.agent.core.conf.Config.Buffer.*;
 import static org.apache.skywalking.apm.agent.core.remote.GRPCChannelStatus.CONNECTED;
 
 /**
+ * 负责将 Trace 数据序列化并发送到 OAP 集群。
+ *
  * @author wusheng
  */
 @DefaultImplementor

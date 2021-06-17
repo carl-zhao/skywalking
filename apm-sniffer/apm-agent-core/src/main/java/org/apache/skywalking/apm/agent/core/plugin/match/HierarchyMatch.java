@@ -34,6 +34,8 @@ import static net.bytebuddy.matcher.ElementMatchers.not;
 /**
  * Match the class by the given super class or interfaces.
  *
+ * 根据父类或是接口匹配目标类。
+ *
  * @author wusheng
  */
 public class HierarchyMatch implements IndirectMatch {

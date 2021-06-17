@@ -25,6 +25,8 @@ import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
  *
  * This is typical used in async plugin, especially RPC plugins.
  *
+ * TraceSegment 是由多个 Span 构成的，AbstractSpan 抽象类是 SkyWalking 对 Span 概念的抽象
+ *
  * @author wusheng
  */
 public interface AsyncSpan {
@@ -41,6 +43,8 @@ public interface AsyncSpan {
      *
      * The execution times of {@link #prepareForAsync} and {@link #asyncFinish()} must match.
      *
+     * Span 在当前线程结束了，但是未被彻底关闭，依然是存活的。
+     *
      * @return the current span
      */
     AbstractSpan prepareForAsync();
@@ -49,6 +53,8 @@ public interface AsyncSpan {
      * Notify the span, it could be finished.
      *
      * The execution times of {@link #prepareForAsync} and {@link #asyncFinish()} must match.
+     *
+     * 当前 Span 真正关闭。它与 prepareForAsync() 方法成对出现。
      *
      * @return the current span
      */

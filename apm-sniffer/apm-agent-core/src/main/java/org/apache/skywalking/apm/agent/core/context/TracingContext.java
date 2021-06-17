@@ -49,11 +49,15 @@ public class TracingContext implements AbstractTracerContext {
 
     /**
      * @see {@link SamplingService}
+     * 负责完成 Agent 端的 Trace 采样，后面会展开介绍具体的采样逻辑。
      */
     private SamplingService samplingService;
 
     /**
      * The final {@link TraceSegment}, which includes all finished spans.
+     *
+     * 它是与当前 Context 上下文关联的 TraceSegment 对象，在 TracingContext 的构造方法中会创建该对象。
+     *
      */
     private TraceSegment segment;
 
@@ -61,11 +65,16 @@ public class TracingContext implements AbstractTracerContext {
      * Active spans stored in a Stack, usually called 'ActiveSpanStack'. This {@link LinkedList} is the in-memory
      * storage-structure. <p> I use {@link LinkedList#removeLast()}, {@link LinkedList#addLast(Object)} and {@link
      * LinkedList#last} instead of {@link #pop()}, {@link #push(AbstractSpan)}, {@link #peek()}
+     *
+     * 用于记录当前 TraceSegment 中所有活跃的 Span（即未关闭的 Span）。实际上 activeSpanStack 字段是作为栈使用的，
+     * TracingContext 提供了 push() 、pop() 、peek() 三个标准的栈方法，以及 first() 方法来访问栈底元素。
+     *
      */
     private LinkedList<AbstractSpan> activeSpanStack = new LinkedList<AbstractSpan>();
 
     /**
      * A counter for the next span.
+     * 它是 Span ID 自增序列，初始值为 0。该字段的自增操作都是在一个线程中完成的，所以无需加锁。
      */
     private int spanIdGenerator;
 
@@ -233,19 +242,27 @@ public class TracingContext implements AbstractTracerContext {
     /**
      * Create an entry span
      *
+     * 一般情况下，在 Agent 插件的前置处理逻辑中，会调用 createEntrySpan() 方法创建 EntrySpan，
+     * 在 TracingContext 的实现中，会检测 EntrySpan 是否已创建，如果是，则不会创建新的 EntrySpan，
+     * 只是重新调用一下其 start() 方法即可。
+     *
      * @param operationName most likely a service name
      * @return span instance. Ref to {@link EntrySpan}
      */
     @Override
     public AbstractSpan createEntrySpan(final String operationName) {
         if (isLimitMechanismWorking()) {
+            // 前面提到过，默认配置下，每个TraceSegment只能放300个Span,超过300就放 NoopSpan
             NoopSpan span = new NoopSpan();
+            // 将Span记录到activeSpanStack这个栈中
             return push(span);
         }
         AbstractSpan entrySpan;
+        // 读取栈顶Span，即当前Span
         final AbstractSpan parentSpan = peek();
         final int parentSpanId = parentSpan == null ? -1 : parentSpan.getSpanId();
         if (parentSpan != null && parentSpan.isEntry()) {
+            // EndpointNameDictionary 的处理，其核心逻辑在前面的小节已经介绍过了。
             entrySpan = (AbstractTracingSpan)DictionaryManager.findEndpointSection()
                 .findOnly(segment.getServiceId(), operationName)
                 .doInCondition(new PossibleFound.FoundAndObtain() {
@@ -257,12 +274,14 @@ public class TracingContext implements AbstractTracerContext {
                         return parentSpan.setOperationName(operationName);
                     }
                 });
+            // 重新调用 start()方法，前面提到过，start()方法会重置operationId(以及或operationName)之外的其他字段
             return entrySpan.start();
         } else {
             entrySpan = (AbstractTracingSpan)DictionaryManager.findEndpointSection()
                 .findOnly(segment.getServiceId(), operationName)
                 .doInCondition(new PossibleFound.FoundAndObtain() {
                     @Override public Object doProcess(int operationId) {
+                        // 新建 EntrySpan对象，spanIdGenerator生成Span ID并递增
                         return new EntrySpan(spanIdGenerator++, parentSpanId, operationId);
                     }
                 }, new PossibleFound.NotFoundAndObtain() {
@@ -270,7 +289,9 @@ public class TracingContext implements AbstractTracerContext {
                         return new EntrySpan(spanIdGenerator++, parentSpanId, operationName);
                     }
                 });
+            // 调用 start()方法，第一次调用start()方法时会设置startTime
             entrySpan.start();
+            // 将新建的Span添加到activeSpanStack栈的栈顶
             return push(entrySpan);
         }
     }
@@ -309,10 +330,13 @@ public class TracingContext implements AbstractTracerContext {
     @Override
     public AbstractSpan createExitSpan(final String operationName, final String remotePeer) {
         AbstractSpan exitSpan;
+        // 从activeSpanStack栈顶获取当前Span
         AbstractSpan parentSpan = peek();
         if (parentSpan != null && parentSpan.isExit()) {
+            // 当前Span已经是ExitSpan，则不再新建ExitSpan，而是调用其start()方法
             exitSpan = parentSpan;
         } else {
+            // 当前Span不是 ExitSpan，就新建一个ExitSpan
             final int parentSpanId = parentSpan == null ? -1 : parentSpan.getSpanId();
             exitSpan = (AbstractSpan)DictionaryManager.findNetworkAddressSection()
                 .find(remotePeer).doInCondition(
@@ -362,8 +386,10 @@ public class TracingContext implements AbstractTracerContext {
                                     });
                         }
                     });
+            // 将新建的ExitSpan入栈
             push(exitSpan);
         }
+        // 调用start()方法
         exitSpan.start();
         return exitSpan;
     }
@@ -388,20 +414,27 @@ public class TracingContext implements AbstractTracerContext {
      */
     @Override
     public boolean stopSpan(AbstractSpan span) {
+        // 获取当前栈顶的Span对象
         AbstractSpan lastSpan = peek();
+        // 只能关闭当前活跃Span对象，否则抛异常
         if (lastSpan == span) {
             if (lastSpan instanceof AbstractTracingSpan) {
                 AbstractTracingSpan toFinishSpan = (AbstractTracingSpan)lastSpan;
+                // 尝试关闭Span
                 if (toFinishSpan.finish(segment)) {
+                    //当Span完全关闭之后，会将其出栈(即从activeSpanStack中删除）
                     pop();
                 }
             } else {
+                // 针对NoopSpan类型Span的处理
                 pop();
             }
         } else {
             throw new IllegalStateException("Stopping the unexpected span = " + span);
         }
 
+        // TraceSegment中全部Span都关闭(且异步状态的Span也关闭了)，则当前
+        // TraceSegment也会关闭，该关闭会触发TraceSegment上传操作，后面详述
         if (checkFinishConditions()) {
             finish();
         }

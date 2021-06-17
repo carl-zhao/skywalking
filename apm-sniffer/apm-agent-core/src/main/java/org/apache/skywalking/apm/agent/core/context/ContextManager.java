@@ -34,6 +34,8 @@ import org.apache.skywalking.apm.util.StringUtil;
  *
  * <p> Also, {@link ContextManager} delegates to all {@link AbstractTracerContext}'s major methods.
  *
+ * 负责管理一个 SkyWalking Agent 中所有的 Context 对象。
+ *
  * @author wusheng
  */
 public class ContextManager implements BootService {

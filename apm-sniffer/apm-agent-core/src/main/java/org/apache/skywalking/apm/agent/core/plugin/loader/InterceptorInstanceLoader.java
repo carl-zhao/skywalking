@@ -32,12 +32,20 @@ import java.util.concurrent.locks.ReentrantLock;
  * This is a very important class in sky-walking's auto-instrumentation mechanism. If you want to fully understand why
  * need this, and how it works, you need have knowledge about Classloader appointment mechanism.
  * <p>
+ *
+ * 前面加载 Interceptpr 的 ClassLoader 并没有使用 AgentClassLoader 的默认实例或是Application ClassLoader，
+ * 而是通过 InterceptorInstanceLoader 完成加载的。 在 InterceptorInstanceLoader 里面会维护一个 ClassLoader Cache，
+ * 以及一个 Instance Cache
  * Created by wusheng on 16/8/2.
  */
 public class InterceptorInstanceLoader {
 
+    // 记录了 instanceKey与实例之间的映射关系，保证单例
     private static ConcurrentHashMap<String, Object> INSTANCE_CACHE = new ConcurrentHashMap<String, Object>();
+
     private static ReentrantLock INSTANCE_LOAD_LOCK = new ReentrantLock();
+
+    // 记录了 targetClassLoader以及其子 AgentClassLoader的对应关系
     private static Map<ClassLoader, ClassLoader> EXTEND_PLUGIN_CLASSLOADERS = new HashMap<ClassLoader, ClassLoader>();
 
     /**
@@ -59,21 +67,26 @@ public class InterceptorInstanceLoader {
         if (targetClassLoader == null) {
             targetClassLoader = InterceptorInstanceLoader.class.getClassLoader();
         }
+        // 通过该 instanceKey保证该 Interceptor在一个 ClassLoader中只创建一次
         String instanceKey = className + "_OF_" + targetClassLoader.getClass().getName() + "@" + Integer.toHexString(targetClassLoader.hashCode());
         Object inst = INSTANCE_CACHE.get(instanceKey);
         if (inst == null) {
             INSTANCE_LOAD_LOCK.lock();
             try {
+                // 查找targetClassLoader对应的子AgentClassLoader
                 ClassLoader pluginLoader = EXTEND_PLUGIN_CLASSLOADERS.get(targetClassLoader);
                 if (pluginLoader == null) {
+                    // 为 targetClassLoader创建子AgentClassLoader
                     pluginLoader = new AgentClassLoader(targetClassLoader);
                     EXTEND_PLUGIN_CLASSLOADERS.put(targetClassLoader, pluginLoader);
                 }
+                // 通过子AgentClassLoader加载Interceptor类
                 inst = Class.forName(className, true, pluginLoader).newInstance();
             } finally {
                 INSTANCE_LOAD_LOCK.unlock();
             }
             if (inst != null) {
+                // 记录Interceptor对象
                 INSTANCE_CACHE.put(instanceKey, inst);
             }
         }

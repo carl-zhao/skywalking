@@ -49,6 +49,8 @@ import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
  * The <code>JVMService</code> represents a timer, which collectors JVM cpu, memory, memorypool and gc info, and send
  * the collected info to Collector through the channel provided by {@link GRPCChannelManager}
  *
+ * JVMService 负责定期请求 MXBean 获取 JVM 监控信息并发送到后端的 OAP 集群。
+ *
  * @author wusheng
  */
 @DefaultImplementor
@@ -63,6 +65,7 @@ public class JVMService implements BootService, Runnable {
     public void prepare() throws Throwable {
         queue = new LinkedBlockingQueue(Config.Jvm.BUFFER_SIZE);
         sender = new Sender();
+        // sender会监听底层的连接状态
         ServiceManager.INSTANCE.findService(GRPCChannelManager.class).addChannelListener(sender);
     }
 
@@ -103,15 +106,19 @@ public class JVMService implements BootService, Runnable {
         ) {
             long currentTimeMillis = System.currentTimeMillis();
             try {
+                // 通过JMX获取CPU、Memory、GC的信息，然后组装成JVMMetric
                 JVMMetric.Builder jvmBuilder = JVMMetric.newBuilder();
                 jvmBuilder.setTime(currentTimeMillis);
+                // 通过 MXBean获取 CPU、内存以及GC相关的信息，并填充到 JVMMetric
                 jvmBuilder.setCpu(CPUProvider.INSTANCE.getCpuMetric());
                 jvmBuilder.addAllMemory(MemoryProvider.INSTANCE.getMemoryMetricList());
                 jvmBuilder.addAllMemoryPool(MemoryPoolProvider.INSTANCE.getMemoryPoolMetricsList());
                 jvmBuilder.addAllGc(GCProvider.INSTANCE.getGCList());
 
                 JVMMetric jvmMetric = jvmBuilder.build();
+                // 将JVMMetric写入到queue缓冲队列中 queue缓冲队列的长度默认为600
                 if (!queue.offer(jvmMetric)) {
+                    // 如果queue队列被填满，则抛弃最老的监控信息，保留最新的
                     queue.poll();
                     queue.offer(jvmMetric);
                 }
@@ -134,10 +141,13 @@ public class JVMService implements BootService, Runnable {
                     try {
                         JVMMetricCollection.Builder builder = JVMMetricCollection.newBuilder();
                         LinkedList<JVMMetric> buffer = new LinkedList<JVMMetric>();
+                        // 将 queue队列中缓存的全部监控数据填充到 buffer中
                         queue.drainTo(buffer);
                         if (buffer.size() > 0) {
+                            // 创建 gRPC请求参数
                             builder.addAllMetrics(buffer);
                             builder.setServiceInstanceId(RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID);
+                            // 通过 gRPC调用将JVM监控数据发送到后端 OAP集群
                             stub.collect(builder.build());
                         }
                     } catch (Throwable t) {

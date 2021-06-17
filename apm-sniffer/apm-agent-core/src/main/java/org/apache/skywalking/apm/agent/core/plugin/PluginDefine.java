@@ -24,12 +24,12 @@ import org.apache.skywalking.apm.util.StringUtil;
 
 public class PluginDefine {
     /**
-     * Plugin name.
+     * 插件名称，以 tomcat-7.x-8.x-plugin 插件第一行为例，就是tomcat-7.x/8.x
      */
     private String name;
 
     /**
-     * The class name of plugin defined.
+     * 插件类，对应上例中的 org.apache.skywalking.apm.plugin.tomcat78x.define.TomcatInstrumentation
      */
     private String defineClass;
 

@@ -46,17 +46,24 @@ public abstract class GCModule implements GCMetricAccessor {
             GCPhrase phrase;
             long gcCount = 0;
             long gcTime = 0;
+            // 下面根据 MXBean的名称判断具体的GC信息
             if (name.equals(getNewGCName())) {
+                // Young GC的信息
                 phrase = GCPhrase.NEW;
+                // 计算GC次数，从MXBean直接拿到的是GC总次数
                 long collectionCount = bean.getCollectionCount();
                 gcCount = collectionCount - lastYGCCount;
+                // 更新 lastYGCCount
                 lastYGCCount = collectionCount;
-
+                // 计算GC时间，从 MXBean直接拿到的是GC总时间
                 long time = bean.getCollectionTime();
                 gcTime = time - lastYGCCollectionTime;
+                // 更新lastYGCCollectionTime
                 lastYGCCollectionTime = time;
             } else if (name.equals(getOldGCName())) {
+                // Old GC的信息
                 phrase = GCPhrase.OLD;
+                // Old GC的计算方式与Young GC的计算方式相同，不再重复
                 long collectionCount = bean.getCollectionCount();
                 gcCount = collectionCount - lastOGCCount;
                 lastOGCCount = collectionCount;

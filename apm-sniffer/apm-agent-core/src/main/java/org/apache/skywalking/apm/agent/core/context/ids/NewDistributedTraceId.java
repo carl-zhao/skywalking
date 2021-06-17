@@ -22,6 +22,9 @@ package org.apache.skywalking.apm.agent.core.context.ids;
 /**
  * The <code>NewDistributedTraceId</code> is a {@link DistributedTraceId} with a new generated id.
  *
+ * NewDistirbutedTraceId 负责生成新 Trace ID，请求刚刚进入系统时，会创建 NewDistirbutedTraceId 对象，
+ * 其构造方法内部会调用 GlobalIdGenerator.generate() 方法生成 ID 对象。
+ *
  * @author wusheng
  */
 public class NewDistributedTraceId extends DistributedTraceId {

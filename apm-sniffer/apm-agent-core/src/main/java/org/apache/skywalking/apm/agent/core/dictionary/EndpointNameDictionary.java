@@ -35,12 +35,27 @@ import static org.apache.skywalking.apm.agent.core.conf.Config.Dictionary.ENDPOI
 
 /**
  * @author wusheng
+ *
+ * 用于同步 Endpoint 字符串的映射关系。
+ *
+ * EndpointNameDictionary 对外提供了两类操作，一个是查询操作（核心实现在 find0() 方法），在查询时首先去 endpointDictionary
+ * 集合查找指定 Endpoint 名称是否已存在相应的数字编号，若存在则正常返回数字编号，若不存在则记录到 unRegisterEndpoints 集合中。
+ * 为了防止占用过多内存导致频繁 GC，endpointDictionary 和 unRegisterEndpoints 集合大小是有上限的（默认两者之和为 10^7）。
+ *
+ * 另一个操作是同步操作（核心实现在 syncRemoteDictionary() 方法），在 ServiceAndEndpointRegisterClient 收到心跳响应之后
+ * ，会将 unRegisterEndpoints 集合中未知的 Endpoint 名称发送到 OAP 集群，然后由 OAP 集群统一分配相应的数字编码
  */
 public enum EndpointNameDictionary {
+    /**
+     *
+     */
     INSTANCE;
     private static final ILog logger = LogManager.getLogger(EndpointNameDictionary.class);
 
+    // 记录已知的 Endpoint 名称映射的数字编号。
     private Map<OperationNameKey, Integer> endpointDictionary = new ConcurrentHashMap<OperationNameKey, Integer>();
+
+    // 记录了未知的 Endpoint 名称。
     private Set<OperationNameKey> unRegisterEndpoints = new ConcurrentSet<OperationNameKey>();
 
     public PossibleFound findOrPrepare4Register(int serviceId, String endpointName,
@@ -73,6 +88,7 @@ public enum EndpointNameDictionary {
     public void syncRemoteDictionary(
         RegisterGrpc.RegisterBlockingStub serviceNameDiscoveryServiceBlockingStub) {
         if (unRegisterEndpoints.size() > 0) {
+            // 创建请求，每个Endpoint中都封装了 Endpoint名称以及关联的serviceId
             Enpoints.Builder builder = Enpoints.newBuilder();
             for (OperationNameKey operationNameKey : unRegisterEndpoints) {
                 Endpoint endpoint = Endpoint.newBuilder()
@@ -82,9 +98,11 @@ public enum EndpointNameDictionary {
                     .build();
                 builder.addEndpoints(endpoint);
             }
+            // 发送同步请求
             EndpointMapping serviceNameMappingCollection = serviceNameDiscoveryServiceBlockingStub.doEndpointRegister(builder.build());
             if (serviceNameMappingCollection.getElementsCount() > 0) {
                 for (EndpointMappingElement element : serviceNameMappingCollection.getElementsList()) {
+                    // 将返回的映射关系，记录到 endpointDictionary集合中，并从 unRegisterEndpoints集合中删除Endpoint信息
                     OperationNameKey key = new OperationNameKey(
                         element.getServiceId(),
                         element.getEndpointName(),

@@ -22,6 +22,9 @@ import java.util.Random;
 import org.apache.skywalking.apm.agent.core.conf.RemoteDownstreamConfig;
 import org.apache.skywalking.apm.agent.core.dictionary.DictionaryUtil;
 
+/**
+ * GlobalIdGenerator 不仅用于生成 Trace ID ，其他需要唯一 ID 的地方也会通过其 nextSeq() 方法生成。
+ */
 public final class GlobalIdGenerator {
     private static final ThreadLocal<IDContext> THREAD_ID_SEQUENCE = new ThreadLocal<IDContext>() {
         @Override
@@ -55,12 +58,13 @@ public final class GlobalIdGenerator {
         if (RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID == DictionaryUtil.nullValue()) {
             throw new IllegalStateException();
         }
+        // THREAD_ID_SEQUENCE是 ThreadLocal<IDContext>类型，即每个线程维护一个 IDContext对象
         IDContext context = THREAD_ID_SEQUENCE.get();
 
         return new ID(
-            RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID,
-            Thread.currentThread().getId(),
-            context.nextSeq()
+            RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID, // service_intance_id
+            Thread.currentThread().getId(), // 当前线程的ID
+            context.nextSeq() // 线程内生成的序列号
         );
     }
 
@@ -78,6 +82,11 @@ public final class GlobalIdGenerator {
             this.threadSeq = threadSeq;
         }
 
+        /**
+         * IDContext.nextSeq() 方法的实现如下，其中 timestamp() 方法在返回时间戳的时候，
+         * 会处理时间回拨的场景（使用 Random 随机生成一个时间戳），nextThreadSeq() 方法的返回值在 [0 , 9999] 这个范围内循环
+         * @return
+         */
         private long nextSeq() {
             return timestamp() * 10000 + nextThreadSeq();
         }

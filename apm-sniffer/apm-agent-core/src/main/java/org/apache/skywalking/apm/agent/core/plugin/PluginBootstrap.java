@@ -66,11 +66,13 @@ public class PluginBootstrap {
         for (PluginDefine pluginDefine : pluginClassList) {
             try {
                 logger.debug("loading plugin class {}.", pluginDefine.getDefineClass());
+                // 注意，这里使用类加载器是默认的AgentClassLoader实例
                 AbstractClassEnhancePluginDefine plugin =
                     (AbstractClassEnhancePluginDefine)Class.forName(pluginDefine.getDefineClass(),
                         true,
                         AgentClassLoader.getDefault())
                         .newInstance();
+                // 记录AbstractClassEnhancePluginDefine 对象
                 plugins.add(plugin);
             } catch (Throwable t) {
                 logger.error(t, "load plugin [{}] failure.", pluginDefine.getDefineClass());

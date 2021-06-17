@@ -64,20 +64,24 @@ public class SnifferConfigInitializer {
         InputStreamReader configFileStream;
 
         try {
+            // 步骤1、加载 agent.config配置文件
             configFileStream = loadConfig();
             Properties properties = new Properties();
             properties.load(configFileStream);
             for (String key : properties.stringPropertyNames()) {
+                // 按照${配置项名称:默认值}的格式解析各个配置项
                 String value = (String)properties.get(key);
                 //replace the key's value. properties.replace(key,value) in jdk8+
                 properties.put(key, PropertyPlaceholderHelper.INSTANCE.replacePlaceholders(value, properties));
             }
+            // 填充 Config中的静态字段
             ConfigInitializer.initialize(properties, Config.class);
         } catch (Exception e) {
             logger.error(e, "Failed to read the config file, skywalking is going to run in default config.");
         }
 
         try {
+            // 步骤2、解析环境变量，并覆盖 Config中相应的静态字段
             overrideConfigBySystemProp();
         } catch (Exception e) {
             logger.error(e, "Failed to read the system properties.");
@@ -87,13 +91,13 @@ public class SnifferConfigInitializer {
             try {
                 agentOptions = agentOptions.trim();
                 logger.info("Agent options is {}.", agentOptions);
-
+                // 步骤3、解析 Java Agent参数，并覆盖 Config中相应的静态字段
                 overrideConfigByAgentOptions(agentOptions);
             } catch (Exception e) {
                 logger.error(e, "Failed to parse the agent options, val is {}.", agentOptions);
             }
         }
-
+        // 检测SERVICE_NAME和BACKEND_SERVICE两个配置项，若为空则抛异常(略)
         if (StringUtil.isEmpty(Config.Agent.SERVICE_NAME)) {
             throw new ExceptionInInitializerError("`agent.service_name` is missing.");
         }

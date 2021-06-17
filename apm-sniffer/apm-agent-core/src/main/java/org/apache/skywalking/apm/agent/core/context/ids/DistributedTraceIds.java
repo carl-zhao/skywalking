@@ -25,6 +25,9 @@ import java.util.List;
 
 /**
  * @author wusheng
+ *
+ * DistributedTraceIds，它表示多个 Trace ID 的集合，其底层封装了一个 LinkedList<DistributedTraceId> 集合，用于记录相关的 Trace ID。
+ *
  */
 public class DistributedTraceIds {
     private LinkedList<DistributedTraceId> relatedGlobalTraces;

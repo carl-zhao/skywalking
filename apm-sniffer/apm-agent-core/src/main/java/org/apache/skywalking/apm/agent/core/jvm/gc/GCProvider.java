@@ -28,15 +28,21 @@ import org.apache.skywalking.apm.network.language.agent.*;
  * @author wusheng
  */
 public enum GCProvider {
+
+    /**
+     *
+     */
     INSTANCE;
 
     private GCMetricAccessor metricAccessor;
     private List<GarbageCollectorMXBean> beans;
 
     GCProvider() {
+        // 获取GC相关的MXBean
         beans = ManagementFactory.getGarbageCollectorMXBeans();
         for (GarbageCollectorMXBean bean : beans) {
             String name = bean.getName();
+            // 解析MXBean的名称即可得知当前使用的是哪种垃圾收集器，我们就可以创建相应的GCMetricAccessor实现
             GCMetricAccessor accessor = findByBeanName(name);
             if (accessor != null) {
                 metricAccessor = accessor;

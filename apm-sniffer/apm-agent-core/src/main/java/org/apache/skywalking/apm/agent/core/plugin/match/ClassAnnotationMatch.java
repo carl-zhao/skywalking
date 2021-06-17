@@ -35,6 +35,8 @@ import static net.bytebuddy.matcher.ElementMatchers.not;
 /**
  * Match the class by the given annotations in class.
  *
+ * 根据标注在类上的注解匹配目标类。
+ *
  * @author wusheng
  */
 public class ClassAnnotationMatch implements IndirectMatch {
@@ -50,13 +52,17 @@ public class ClassAnnotationMatch implements IndirectMatch {
     @Override
     public ElementMatcher.Junction buildJunction() {
         ElementMatcher.Junction junction = null;
+        // 遍历全部注解
         for (String annotation : annotations) {
             if (junction == null) {
+                // 该Junction用于检测类是否标注了指定注解
                 junction = buildEachAnnotation(annotation);
             } else {
+                // 使用 and 方式将所有Junction对象连接起来
                 junction = junction.and(buildEachAnnotation(annotation));
             }
         }
+        // 排除接口
         junction = junction.and(not(isInterface()));
         return junction;
     }
@@ -64,10 +70,13 @@ public class ClassAnnotationMatch implements IndirectMatch {
     @Override
     public boolean isMatch(TypeDescription typeDescription) {
         List<String> annotationList = new ArrayList<String>(Arrays.asList(annotations));
+        // 获取该类上的注解
         AnnotationList declaredAnnotations = typeDescription.getDeclaredAnnotations();
         for (AnnotationDescription annotation : declaredAnnotations) {
+            // 匹配一个删除一个
             annotationList.remove(annotation.getAnnotationType().getActualName());
         }
+        // 删空了，就匹配成功了
         if (annotationList.isEmpty()) {
             return true;
         }

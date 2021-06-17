@@ -33,9 +33,15 @@ import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
  * The <code>ServiceManager</code> bases on {@link ServiceLoader},
  * load all {@link BootService} implementations.
  *
+ * ServiceManager 是 BootService 实例的管理器，主要负责管理 BootService 实例的生命周期。
+ *
  * @author wusheng
  */
 public enum ServiceManager {
+
+    /**
+     * 实例对象
+     */
     INSTANCE;
 
     private static final ILog logger = LogManager.getLogger(ServiceManager.class);
@@ -43,9 +49,11 @@ public enum ServiceManager {
 
     public void boot() {
         bootedServices = loadAllServices();
-
+        // 调用全部BootService对象的prepare()方法
         prepare();
+        // 调用全部BootService对象的boot()方法
         startup();
+        // 调用全部BootService对象的onComplete()方法
         onComplete();
     }
 
@@ -59,6 +67,11 @@ public enum ServiceManager {
         }
     }
 
+    /**
+     * @DefaultImplementor 注解用于标识 BootService 接口的默认实现。
+     * @OverrideImplementor 注解用于覆盖默认 BootService 实现，通过其 value 字段指定要覆盖的默认实现。
+     * @return
+     */
     private Map<Class, BootService> loadAllServices() {
         Map<Class, BootService> bootedServices = new LinkedHashMap<Class, BootService>();
         List<BootService> allServices = new LinkedList<BootService>();
@@ -145,8 +158,10 @@ public enum ServiceManager {
     }
 
     void load(List<BootService> allServices) {
+        // 很明显使用了 JDK SPI 技术加载并实例化 META-INF/services下的全部BootService接口实现
         Iterator<BootService> iterator = ServiceLoader.load(BootService.class, AgentClassLoader.getDefault()).iterator();
         while (iterator.hasNext()) {
+            // 记录到方法参数传入的 allServices集合中
             allServices.add(iterator.next());
         }
     }

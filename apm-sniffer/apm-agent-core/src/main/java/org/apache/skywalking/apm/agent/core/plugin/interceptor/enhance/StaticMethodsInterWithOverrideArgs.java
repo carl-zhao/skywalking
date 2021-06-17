@@ -67,11 +67,13 @@ public class StaticMethodsInterWithOverrideArgs {
     @RuntimeType
     public Object intercept(@Origin Class<?> clazz, @AllArguments Object[] allArguments, @Origin Method method,
         @Morph OverrideCallable zuper) throws Throwable {
+        // 加载插件指定的StaticMethodsAroundInterceptor
         StaticMethodsAroundInterceptor interceptor = InterceptorInstanceLoader
             .load(staticMethodsAroundInterceptorClassName, clazz.getClassLoader());
 
         MethodInterceptResult result = new MethodInterceptResult();
         try {
+            // 调用 interceptor.before()做前置处理
             interceptor.beforeMethod(clazz, method, allArguments, method.getParameterTypes(), result);
         } catch (Throwable t) {
             logger.error(t, "class[{}] before static method[{}] intercept failure", clazz, method.getName());
@@ -79,13 +81,16 @@ public class StaticMethodsInterWithOverrideArgs {
 
         Object ret = null;
         try {
+            // 根据before()的处理结果判定是否调用目标方法
             if (!result.isContinue()) {
                 ret = result._ret();
             } else {
+                // 注意：这里是需要传参的，这些参数我们是可以在before()方法中改动的，这就是OverrideArgs的意义
                 ret = zuper.call(allArguments);
             }
         } catch (Throwable t) {
             try {
+                // 如果出现异常，会先通知interceptor中的handleMethodException()方法进行处理
                 interceptor.handleMethodException(clazz, method, allArguments, method.getParameterTypes(), t);
             } catch (Throwable t2) {
                 logger.error(t2, "class[{}] handle static method[{}] exception failure", clazz, method.getName(), t2.getMessage());
@@ -93,6 +98,7 @@ public class StaticMethodsInterWithOverrideArgs {
             throw t;
         } finally {
             try {
+                // 通过after()方法进行后置处理
                 ret = interceptor.afterMethod(clazz, method, allArguments, method.getParameterTypes(), ret);
             } catch (Throwable t) {
                 logger.error(t, "class[{}] after static method[{}] intercept failure:{}", clazz, method.getName(), t.getMessage());

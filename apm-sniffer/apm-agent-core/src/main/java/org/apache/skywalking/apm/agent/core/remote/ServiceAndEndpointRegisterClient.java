@@ -49,6 +49,13 @@ import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
 import org.apache.skywalking.apm.util.StringUtil;
 
 /**
+ *
+ * ServiceAndEndpointRegisterClient
+ *
+ * 1. 注册功能：其中包括服务注册和服务实例注册两次请求。
+ * 2. 定期发送心跳请求：与后端 OAP 集群维持定期探活，让后端 OAP 集群知道该 Agent 正常在线。
+ * 3. 定期同步 Endpoint 名称以及网络地址：维护当前 Agent 中字符串与数字编号的映射关系，减少后续 Trace 数据传输的网络压力，提高请求的有效负载。
+ *
  * @author wusheng
  */
 @DefaultImplementor
@@ -64,20 +71,26 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
     @Override
     public void statusChanged(GRPCChannelStatus status) {
         if (GRPCChannelStatus.CONNECTED.equals(status)) {
+            // 网络连接创建成功时，会依赖该连接创建两个stub客户端
             Channel channel = ServiceManager.INSTANCE.findService(GRPCChannelManager.class).getChannel();
             registerBlockingStub = RegisterGrpc.newBlockingStub(channel);
             serviceInstancePingStub = ServiceInstancePingGrpc.newBlockingStub(channel);
         } else {
+            // 网络连接断开时，更新两个stub字段（它们都是volatile修饰）
             registerBlockingStub = null;
             serviceInstancePingStub = null;
         }
+        // 更新status字段，记录网络状态
         this.status = status;
     }
 
     @Override
     public void prepare() throws Throwable {
+        // 查找 GRPCChannelManager实例(前面介的ServiceManager.bootedServices集合会按照类型维护BootService实例，查找也是查找该集合)，
+        // 然后将 ServiceAndEndpointRegisterClient注册成Listener
         ServiceManager.INSTANCE.findService(GRPCChannelManager.class).addChannelListener(this);
 
+        // 确定INSTANCE_UUID，优先使用gent.config文件中配置的INSTANCE_UUID若未配置则随机生成
         INSTANCE_UUID = StringUtil.isEmpty(Config.Agent.INSTANCE_UUID) ? UUID.randomUUID().toString()
             .replaceAll("-", "") : Config.Agent.INSTANCE_UUID;
     }
@@ -110,27 +123,32 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
         while (GRPCChannelStatus.CONNECTED.equals(status) && shouldTry) {
             shouldTry = false;
             try {
+                // 检测当前Agent是否已完成了Service注册
                 if (RemoteDownstreamConfig.Agent.SERVICE_ID == DictionaryUtil.nullValue()) {
-                    if (registerBlockingStub != null) {
+                    if (registerBlockingStub != null) { // 第二次检查网络状态
+                        // 通过doServiceRegister()接口进行Service注册
                         ServiceRegisterMapping serviceRegisterMapping = registerBlockingStub.doServiceRegister(
                             Services.newBuilder().addServices(Service.newBuilder().setServiceName(Config.Agent.SERVICE_NAME)).build());
                         if (serviceRegisterMapping != null) {
                             for (KeyIntValuePair registered : serviceRegisterMapping.getServicesList()) {
                                 if (Config.Agent.SERVICE_NAME.equals(registered.getKey())) {
                                     RemoteDownstreamConfig.Agent.SERVICE_ID = registered.getValue();
+                                    // 设置shouldTry，紧跟着会执行服务实例注册
                                     shouldTry = true;
                                 }
                             }
                         }
                     }
                 } else {
+                    // 后续会执行服务实例注册以及心跳操作
                     if (registerBlockingStub != null) {
                         if (RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID == DictionaryUtil.nullValue()) {
-
+                            // 调用 doServiceInstanceRegister()接口，用serviceId和INSTANCE_UUID换取SERVICE_INSTANCE_ID
                             ServiceInstanceRegisterMapping instanceMapping = registerBlockingStub.doServiceInstanceRegister(ServiceInstances.newBuilder()
                                 .addInstances(
                                     ServiceInstance.newBuilder()
                                         .setServiceId(RemoteDownstreamConfig.Agent.SERVICE_ID)
+                                        // 除了serviceId，还会传递uuid、时间戳以及系统信息之类的
                                         .setInstanceUUID(INSTANCE_UUID)
                                         .setTime(System.currentTimeMillis())
                                         .addAllProperties(OSUtil.buildOSInfo())
@@ -139,11 +157,13 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
                                 if (INSTANCE_UUID.equals(serviceInstance.getKey())) {
                                     int serviceInstanceId = serviceInstance.getValue();
                                     if (serviceInstanceId != DictionaryUtil.nullValue()) {
+                                        // 记录serviceIntanceId
                                         RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID = serviceInstanceId;
                                     }
                                 }
                             }
                         } else {
+                            // 并没有对心跳请求的响应做处理
                             serviceInstancePingStub.doPing(ServiceInstancePingPkg.newBuilder()
                                 .setServiceInstanceId(RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID)
                                 .setTime(System.currentTimeMillis())

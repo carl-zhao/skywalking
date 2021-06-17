@@ -35,11 +35,18 @@ import org.apache.skywalking.apm.network.language.agent.v2.SegmentObject;
  * A {@link TraceSegment} means the segment, which exists in current {@link Thread}. And the distributed trace is formed
  * by multi {@link TraceSegment}s, because the distributed trace crosses multi-processes, multi-threads. <p>
  *
+ * TraceSegment 是一个介于 Trace 与 Span 之间的概念，它是一条 Trace 的一段，可以包含多个 Span。在微服务架构中，
+ * 一个请求基本都会涉及跨进程（以及跨线程）的操作，例如， RPC 调用、通过 MQ 异步执行、HTTP 请求远端资源等，处理一个
+ * 请求就需要涉及到多个服务的多个线程。TraceSegment 记录了一个请求在一个线程中的执行流程（即 Trace 信息）。
+ * 将该请求关联的 TraceSegment 串联起来，就能得到该请求对应的完整 Trace。
+ *
  * @author wusheng
  */
 public class TraceSegment {
     /**
      * The id of this trace segment. Every segment has its unique-global-id.
+     *
+     * TraceSegment 的全局唯一标识，是由前面介绍的 GlobalIdGenerator 生成的。
      */
     private ID traceSegmentId;
 
@@ -48,6 +55,10 @@ public class TraceSegment {
      * element, but if this segment is a start span of batch process, the segment faces multi parents, at this moment,
      * we use this {@link #refs} to link them.
      *
+     * 它指向父 TraceSegment。在我们常见的 RPC 调用、HTTP 请求等跨进程调用中，一个 TraceSegment 最多只有一个父
+     * TraceSegment，但是在一个 Consumer 批量消费 MQ 消息时，同一批内的消息可能来自不同的 Producer，这就会导致
+     * Consumer 线程对应的 TraceSegment 有多个父 TraceSegment 了，当然，该 Consumer TraceSegment 也就属于多个 Trace 了。
+     *
      * This field will not be serialized. Keeping this field is only for quick accessing.
      */
     private List<TraceSegmentRef> refs;
@@ -55,6 +66,9 @@ public class TraceSegment {
     /**
      * The spans belong to this trace segment. They all have finished. All active spans are hold and controlled by
      * "skywalking-api" module.
+     *
+     * 当前 TraceSegment 包含的所有 Span。
+     *
      */
     private List<AbstractTracingSpan> spans;
 
@@ -65,11 +79,22 @@ public class TraceSegment {
      * <code>relatedGlobalTraces</code> and {@link #refs} is: {@link #refs} targets this {@link TraceSegment}'s direct
      * parent, <p> and <p> <code>relatedGlobalTraces</code> targets this {@link TraceSegment}'s related call chain, a
      * call chain contains multi {@link TraceSegment}s, only using {@link #refs} is not enough for analysis and ui.
+     *
+     * 记录当前 TraceSegment 所属 Trace 的 Trace ID。
+     *
      */
     private DistributedTraceIds relatedGlobalTraces;
 
+    /**
+     * ignore 字段表示当前 TraceSegment 是否被忽略。主要是为了忽略一些问题 TraceSegment（主要是对只包含一个 Span 的 Trace 进行采样收集）。
+     */
     private boolean ignore = false;
 
+    /**
+     * 这是一个容错设计，例如业务代码出现了死循环 Bug，可能会向相应的 TraceSegment 中不断追加 Span，
+     * 为了防止对应用内存以及后端存储造成不必要的压力，每个 TraceSegment 中 Span 的个数是有上限的（默认值为 300），
+     * 超过上限之后，就不再添加 Span了。
+     */
     private boolean isSizeLimited = false;
 
     /**

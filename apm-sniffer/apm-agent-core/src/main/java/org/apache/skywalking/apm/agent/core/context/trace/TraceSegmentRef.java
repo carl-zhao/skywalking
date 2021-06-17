@@ -34,27 +34,44 @@ import org.apache.skywalking.apm.util.StringUtil;
  * Created by wusheng on 2017/2/17.
  */
 public class TraceSegmentRef {
+
+    // 父 Span 信息
+
+    /** SegmentRefType 是个枚举，可选值有：CROSS_PROCESS、CROSS_THREAD，分别表示跨进程调用和跨线程调用。 */
     private SegmentRefType type;
 
+    /** 父 TraceSegment 的 ID。 */
     private ID traceSegmentId;
 
+    /** 父 Span 的 ID，与 traceSegmentId 结合就可以确定父 Span。 */
     private int spanId = -1;
 
+    // 父应用（或者说，上游调用方）信息
+
+    /** 父应用（即上游调用方）的地址信息。 */
     private int peerId = DictionaryUtil.nullValue();
 
+    /** 父应用（即上游调用方）的地址信息。 */
     private String peerHost;
 
-    private int entryServiceInstanceId = DictionaryUtil.nullValue();
-
+    /** 父应用（即上游应用）的 ServiceInstanceId。 */
     private int parentServiceInstanceId = DictionaryUtil.nullValue();
 
-    private String entryEndpointName;
+    /** 父应用的（即上游应用）的 Endpoint 信息。 */
+    private int parentEndpointId = DictionaryUtil.nullValue();
 
-    private int entryEndpointId = DictionaryUtil.nullValue();
-
+    /** 父应用的（即上游应用）的 Endpoint 信息。 */
     private String parentEndpointName;
 
-    private int parentEndpointId = DictionaryUtil.nullValue();
+    // 入口信息（在整条 Trace 中都会传递该信息)
+    /** Endpoint 信息。 */
+    private String entryEndpointName;
+
+    /** Endpoint 信息。 */
+    private int entryEndpointId = DictionaryUtil.nullValue();
+
+    /** 入口应用的 ServiceInstanceId。 */
+    private int entryServiceInstanceId = DictionaryUtil.nullValue();
 
     /**
      * Transform a {@link ContextCarrier} to the <code>TraceSegmentRef</code>

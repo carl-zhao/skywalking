@@ -42,7 +42,17 @@ import static net.bytebuddy.matcher.ElementMatchers.not;
  * @author wusheng
  */
 public class PluginFinder {
+
+    /**
+     * 如果返回值为NameMatch类型，则相应 AbstractClassEnhancePluginDefine
+     * 对象会记录到该集合
+     */
     private final Map<String, LinkedList<AbstractClassEnhancePluginDefine>> nameMatchDefine = new HashMap<String, LinkedList<AbstractClassEnhancePluginDefine>>();
+
+    /**
+     * 如果是其他类型返回值，则相应 AbstractClassEnhancePluginDefine
+     * 对象会记录到该集合
+     */
     private final List<AbstractClassEnhancePluginDefine> signatureMatchDefine = new LinkedList<AbstractClassEnhancePluginDefine>();
 
     public PluginFinder(List<AbstractClassEnhancePluginDefine> plugins) {
